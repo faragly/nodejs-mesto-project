@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { Error } from 'mongoose';
 
+import { StatusCodes } from '../constants/status-codes';
 import { NotFoundError, ValidationError } from '../errors';
 import Card from '../models/card';
 import { AuthContext } from '../types/types';
@@ -16,7 +17,7 @@ export async function createCard(
       name: req.body.name,
       owner: res.locals.user._id,
     });
-    res.status(201).send(card);
+    res.status(StatusCodes.CREATED).send(card);
   } catch (err) {
     if (err instanceof Error.ValidationError) {
       next(new ValidationError('Переданы некорректные данные'));
@@ -36,7 +37,7 @@ export async function deleteCard(
     if (!card) {
       throw new NotFoundError('Карточка не найдена');
     }
-    res.status(200).send(card);
+    res.status(StatusCodes.OK).send(card);
   } catch (err) {
     next(err);
   }

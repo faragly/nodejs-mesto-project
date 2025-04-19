@@ -1,6 +1,8 @@
-export enum ErrorCodes {
+export enum StatusCodes {
+  CREATED = 201,
   NOT_AUTHORIZED = 401,
   NOT_FOUND = 404,
+  OK = 200,
   SERVER_ERROR = 500,
   VALIDATION_ERROR = 400,
 }
