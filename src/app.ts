@@ -3,7 +3,8 @@ import express, { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 
 import { NotFoundError } from './errors';
-import addUserId from './middlewares/addUserId';
+import addUserIdMiddleware from './middlewares/add-user-id';
+import errorMiddleware from './middlewares/error';
 import cardsRouter from './routes/cards';
 import usersRouter from './routes/users';
 
@@ -25,13 +26,15 @@ mongoose
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
-app.use(addUserId);
+app.use(addUserIdMiddleware);
 app.use('/users', usersRouter);
 app.use('/cards', cardsRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(new NotFoundError('Маршрут не найден'));
 });
+
+app.use(errorMiddleware);
 
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
