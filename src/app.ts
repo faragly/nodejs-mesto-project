@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 
 import { LOGIN_VALIDATORS } from './constants';
 import { CREATE_USER_VALIDATORS, createUser, login } from './controllers/users';
+import auth from './middlewares/auth';
 import cardsRouter from './routes/cards';
 import usersRouter from './routes/users';
 
@@ -29,6 +30,8 @@ mongoose
 
 app.post('/signin', ...LOGIN_VALIDATORS, login);
 app.post('/signup', ...CREATE_USER_VALIDATORS, createUser);
+
+app.use(auth);
 
 app.use('/users', usersRouter);
 app.use('/cards', cardsRouter);

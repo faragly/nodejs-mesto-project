@@ -1,8 +1,7 @@
 import { Router } from 'express';
 
 import {
-  CREATE_USER_VALIDATORS,
-  createUser,
+  getCurrentUser,
   getUserById,
   getUsers,
   UPDATE_AVATAR_VALIDATORS,
@@ -15,8 +14,8 @@ import {
 const router = Router();
 
 router.get('/', getUsers);
+router.get('/me', getCurrentUser);
 router.get('/:id', ...USER_ID_VALIDATORS, getUserById);
-router.post('/', ...CREATE_USER_VALIDATORS, createUser);
 router.patch('/me', ...UPDATE_USER_VALIDATORS, updateUserInfo);
 router.patch('/me/avatar', ...UPDATE_AVATAR_VALIDATORS, updateUserAvatar);
 

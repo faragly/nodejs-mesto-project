@@ -66,6 +66,27 @@ export async function createUser(
   }
 }
 
+export async function getCurrentUser(
+  _req: Request,
+  res: Response<unknown, AuthContext>,
+  next: NextFunction,
+) {
+  try {
+    const id = res.locals.user._id;
+    const user = await User.findById(id);
+
+    if (!user) {
+      res
+        .status(StatusCodes.NOT_FOUND)
+        .send({ message: 'Пользователь не найден' });
+    }
+
+    res.send(user);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getUserById(
   req: Request,
   res: Response,
