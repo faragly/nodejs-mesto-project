@@ -1,6 +1,7 @@
 export enum StatusCodes {
   CONFLICT = 409,
   CREATED = 201,
+  FORBIDDEN = 403,
   NOT_AUTHORIZED = 401,
   NOT_FOUND = 404,
   OK = 200,

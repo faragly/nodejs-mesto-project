@@ -58,13 +58,17 @@ export async function deleteCard(
         .send('Переданы некорректные данные');
     }
 
+    const userId = res.locals.user._id;
     const { id } = matchedData<{ id: string }>(req);
-    const card = await Card.findByIdAndDelete(id);
+    const card = await Card.findById(id);
 
     if (!card) {
       res.status(StatusCodes.NOT_FOUND).send('Карточка не найдена');
+    } else if (card.owner.toString() !== userId) {
+      res.status(StatusCodes.FORBIDDEN).send('Доступ к операции запрещён');
     }
 
+    await Card.findByIdAndDelete(id);
     res.status(StatusCodes.OK).send(card);
   } catch (err) {
     next(err);
