@@ -1,10 +1,10 @@
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
-import express, { NextFunction, Request, Response } from 'express';
+import express from 'express';
 import mongoose from 'mongoose';
 
-import { NotFoundError } from './errors';
-import addUserIdMiddleware from './middlewares/add-user-id';
-import errorMiddleware from './middlewares/error';
+import { LOGIN_VALIDATORS } from './constants';
+import { CREATE_USER_VALIDATORS, createUser, login } from './controllers/users';
 import cardsRouter from './routes/cards';
 import usersRouter from './routes/users';
 
@@ -19,6 +19,7 @@ const {
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
 mongoose
@@ -26,15 +27,11 @@ mongoose
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
-app.use(addUserIdMiddleware);
+app.post('/signin', ...LOGIN_VALIDATORS, login);
+app.post('/signup', ...CREATE_USER_VALIDATORS, createUser);
+
 app.use('/users', usersRouter);
 app.use('/cards', cardsRouter);
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  next(new NotFoundError('Маршрут не найден'));
-});
-
-app.use(errorMiddleware);
 
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);

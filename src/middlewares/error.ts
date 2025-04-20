@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 
-import { StatusCodes } from '../constants/status-codes';
+import { StatusCodes } from '../constants';
 
 const errorMiddleware = (
   err: { statusCode: number } & Error,

@@ -1,12 +1,25 @@
-import { Model, model, Schema } from 'mongoose';
+import { compare } from 'bcrypt';
+import { Document, Model, model, Schema } from 'mongoose';
+import isEmail from 'validator/lib/isEmail';
 
-type User = {
+import { AuthError } from '../errors/auth-error';
+
+export type User = {
   about: string;
   avatar: string;
+  email: string;
   name: string;
+  password: string;
 };
 
-const userSchema = new Schema<User>({
+interface UserModel extends Model<User> {
+  findUserByCredentials: (
+    email: string,
+    password: string,
+  ) => Promise<Document<unknown, unknown, User>>;
+}
+
+const userSchema = new Schema<User, UserModel>({
   about: {
     default: 'Исследователь',
     maxlength: 30,
@@ -28,6 +41,15 @@ const userSchema = new Schema<User>({
       },
     },
   },
+  email: {
+    required: true,
+    type: String,
+    unique: true,
+    validate: {
+      message: 'Email некорректен',
+      validator: (str: string) => isEmail(str),
+    },
+  },
   name: {
     default: 'Жак-Ив Кусто',
     maxlength: 30,
@@ -35,6 +57,30 @@ const userSchema = new Schema<User>({
     required: true,
     type: String,
   },
+  password: {
+    required: true,
+    select: false,
+    type: String,
+  },
 });
 
-export default model<User, Model<User>>('user', userSchema);
+userSchema.static(
+  'findUserByCredentials',
+  async function findUserByCredentials(email: string, password: string) {
+    const user = await this.findOne({ email }).select('+password');
+
+    if (!user) {
+      throw new AuthError('Неправильные почта или пароль');
+    }
+
+    const hasMatch = await compare(password, user.password);
+
+    if (!hasMatch) {
+      throw new AuthError('Неправильные почта или пароль');
+    }
+
+    return user;
+  },
+);
+
+export default model<User, UserModel>('user', userSchema);

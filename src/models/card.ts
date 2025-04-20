@@ -1,6 +1,6 @@
 import { model, Schema } from 'mongoose';
 
-type Card = {
+export type Card = {
   createdAt: Date;
   likes: Schema.Types.ObjectId[];
   link: string;

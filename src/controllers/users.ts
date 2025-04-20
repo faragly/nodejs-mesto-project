@@ -1,9 +1,38 @@
+import { hash } from 'bcrypt';
+import dotenv from 'dotenv';
 import { NextFunction, Request, Response } from 'express';
-import { Error } from 'mongoose';
+import {
+  body,
+  matchedData,
+  param,
+  Result,
+  ValidationError,
+  validationResult,
+} from 'express-validator';
+import jwt from 'jsonwebtoken';
 
-import { NotFoundError, ValidationError } from '../errors';
-import User from '../models/user';
+import { MONGO_DUPLICATE_ERROR, StatusCodes } from '../constants';
+import { AuthError } from '../errors/auth-error';
+import User, { type User as TUser } from '../models/user';
 import { AuthContext } from '../types/types';
+
+dotenv.config();
+const { JWT_SECRET, NODE_ENV } = process.env;
+
+export const UPDATE_USER_VALIDATORS = [
+  body('name').isString().isLength({ max: 30, min: 2 }),
+  body('about').isString().isLength({ max: 30, min: 2 }),
+  body('avatar').isURL(),
+];
+
+export const CREATE_USER_VALIDATORS = UPDATE_USER_VALIDATORS.concat([
+  body('email').isEmail(),
+  body('password').isString(),
+]);
+
+export const USER_ID_VALIDATORS = [param('id').isMongoId()];
+
+export const UPDATE_AVATAR_VALIDATORS = [body('avatar').isURL()];
 
 export async function createUser(
   req: Request,
@@ -11,15 +40,26 @@ export async function createUser(
   next: NextFunction,
 ) {
   try {
-    const user = await User.create({
-      about: req.body.about,
-      avatar: req.body.avatar,
-      name: req.body.name,
-    });
+    const result: Result<ValidationError> = validationResult(req);
+
+    if (!result.isEmpty()) {
+      res
+        .status(StatusCodes.VALIDATION_ERROR)
+        .send('Переданы некорректные данные');
+    }
+
+    const data = matchedData<TUser>(req);
+    const passwordHash = await hash(data.password, 10);
+    const user = await User.create({ ...data, password: passwordHash });
     res.status(201).send(user);
   } catch (err) {
-    if (err instanceof Error.ValidationError) {
-      next(new ValidationError('Переданы некорректные данные'));
+    if (
+      err instanceof Error &&
+      err.message.includes(MONGO_DUPLICATE_ERROR.toString())
+    ) {
+      res
+        .status(StatusCodes.CONFLICT)
+        .send({ message: 'Пользователь с таким email уже существует' });
     } else {
       next(err);
     }
@@ -32,10 +72,21 @@ export async function getUserById(
   next: NextFunction,
 ) {
   try {
-    const user = await User.findById(req.params.id);
+    const result: Result<ValidationError> = validationResult(req);
+
+    if (!result.isEmpty()) {
+      res
+        .status(StatusCodes.VALIDATION_ERROR)
+        .send('Переданы некорректные данные');
+    }
+
+    const { id } = matchedData<{ id: string }>(req);
+    const user = await User.findById(id);
 
     if (!user) {
-      throw new NotFoundError('Пользователь с таким идентификатором не найден');
+      res
+        .status(StatusCodes.NOT_FOUND)
+        .send('Пользователь с таким идентификатором не найден');
     }
 
     res.send(user);
@@ -57,34 +108,65 @@ export async function getUsers(
   }
 }
 
+export async function login(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { email, password } =
+      matchedData<Pick<TUser, 'email' | 'password'>>(req);
+
+    const user = await User.findUserByCredentials(email, password);
+
+    const token = jwt.sign(
+      { _id: user._id },
+      NODE_ENV === 'production' ? JWT_SECRET! : 'secret-key',
+      {
+        expiresIn: '7d',
+      },
+    );
+    res
+      .cookie('jwt', token, {
+        httpOnly: true,
+        maxAge: 10800000,
+        sameSite: true,
+      })
+      .send({ message: 'Авторизация успешна' });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      res.status(err.statusCode).send({ message: err.message });
+    } else {
+      next(err);
+    }
+  }
+}
+
 export async function updateUserAvatar(
   req: Request,
   res: Response<unknown, AuthContext>,
   next: NextFunction,
 ) {
   try {
-    const user = await User.findByIdAndUpdate(
-      res.locals.user._id,
-      { avatar: req.body.avatar },
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
+    const result: Result<ValidationError> = validationResult(req);
+
+    if (!result.isEmpty()) {
+      res
+        .status(StatusCodes.VALIDATION_ERROR)
+        .send('Переданы некорректные данные');
+    }
+
+    const data = matchedData<Pick<TUser, 'avatar'>>(req);
+    const user = await User.findByIdAndUpdate(res.locals.user._id, data, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!user) {
-      throw new NotFoundError('Пользователь с таким идентификатором не найден');
+      res
+        .status(StatusCodes.NOT_FOUND)
+        .send('Пользователь с таким идентификатором не найден');
     }
 
     res.send(user);
   } catch (err) {
-    if (err instanceof Error.CastError) {
-      next(new ValidationError('Некорректный тип данных'));
-    } else if (err instanceof Error.ValidationError) {
-      next(new ValidationError('Переданы некорректные данные'));
-    } else {
-      next(err);
-    }
+    next(err);
   }
 }
 
@@ -94,23 +176,28 @@ export async function updateUserInfo(
   next: NextFunction,
 ) {
   try {
-    const user = await User.findByIdAndUpdate(res.locals.user._id, req.body, {
+    const result: Result<ValidationError> = validationResult(req);
+
+    if (!result.isEmpty()) {
+      res
+        .status(StatusCodes.VALIDATION_ERROR)
+        .send('Переданы некорректные данные');
+    }
+
+    const data = matchedData<Pick<TUser, 'about' | 'name'>>(req);
+    const user = await User.findByIdAndUpdate(res.locals.user._id, data, {
       new: true,
       runValidators: true,
     });
 
     if (!user) {
-      throw new NotFoundError('Пользователь с таким идентификатором не найден');
+      res
+        .status(StatusCodes.NOT_FOUND)
+        .send('Пользователь с таким идентификатором не найден');
     }
 
     res.send(user);
   } catch (err) {
-    if (err instanceof Error.CastError) {
-      next(new ValidationError('Некорректный тип данных'));
-    } else if (err instanceof Error.ValidationError) {
-      next(new ValidationError('Переданы некорректные данные'));
-    } else {
-      next(err);
-    }
+    next(err);
   }
 }

@@ -1,4 +1,4 @@
-import { StatusCodes } from '../constants/status-codes';
+import { StatusCodes } from '../constants';
 
 export class AuthError extends Error {
   statusCode: number;
