@@ -2,7 +2,7 @@ import { compare } from 'bcrypt';
 import { Document, Model, model, Schema } from 'mongoose';
 import isEmail from 'validator/lib/isEmail';
 
-import { AuthError } from '../errors/auth-error';
+import { AuthError } from '../errors';
 
 export type User = {
   about: string;

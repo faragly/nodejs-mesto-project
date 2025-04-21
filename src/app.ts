@@ -1,12 +1,14 @@
+import { errors } from 'celebrate';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
 
-import { LOGIN_VALIDATORS, StatusCodes } from './constants';
-import { CREATE_USER_VALIDATORS, createUser, login } from './controllers/users';
+import { validateCreateUser, validateLogin } from './constants';
+import { createUser, login } from './controllers/users';
+import { NotFoundError } from './errors';
 import auth from './middlewares/auth';
-import error from './middlewares/error';
+import errorMiddleware from './middlewares/error';
 import { errorLogger, requestLogger } from './middlewares/logger';
 import cardsRouter from './routes/cards';
 import usersRouter from './routes/users';
@@ -32,19 +34,22 @@ mongoose
 
 app.use(requestLogger);
 
-app.post('/signin', ...LOGIN_VALIDATORS, login);
-app.post('/signup', ...CREATE_USER_VALIDATORS, createUser);
+app.post('/signin', validateLogin, login);
+app.post('/signup', validateCreateUser, createUser);
 
 app.use(auth);
 
 app.use('/users', usersRouter);
 app.use('/cards', cardsRouter);
 
-app.use((req, res) => {
-  res.status(StatusCodes.NOT_FOUND).send('Маршрут не найден');
+app.use(errorLogger);
+app.use(errors());
+
+app.all(/^\//, (req, res, next) => {
+  next(new NotFoundError('Маршрут не найден'));
 });
 
-app.use(errorLogger);
+app.use(errorMiddleware);
 
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);

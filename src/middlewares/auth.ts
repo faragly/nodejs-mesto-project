@@ -2,11 +2,11 @@ import dotenv from 'dotenv';
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
-import { StatusCodes } from '../constants';
+import { AuthError } from '../errors';
 import { AuthContext } from '../types/types';
 
 dotenv.config();
-const { JWT_SECRET, NODE_ENV } = process.env;
+const { JWT_SECRET = 'secret-key', NODE_ENV = 'development' } = process.env;
 
 const authMiddleware = (
   req: Request,
@@ -17,20 +17,18 @@ const authMiddleware = (
     const { cookies } = req;
 
     if (!cookies || !cookies.jwt) {
-      throw new Error('Необходима авторизация');
+      throw new AuthError('Необходима авторизация');
     }
 
     const payload = jwt.verify(
       cookies.jwt,
-      NODE_ENV === 'production' ? JWT_SECRET! : 'secret-key',
+      NODE_ENV === 'production' ? JWT_SECRET : 'secret-key',
     );
     res.locals.user = payload as { _id: string };
 
     next();
   } catch {
-    res
-      .status(StatusCodes.NOT_AUTHORIZED)
-      .send({ message: 'Необходима авторизация' });
+    next(new AuthError('Необходима авторизация'));
   }
 };
 
